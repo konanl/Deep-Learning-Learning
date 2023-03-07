@@ -1674,6 +1674,778 @@ cv2.destroyAllWindows()
 
 ### 8.4 腐蚀操作
 
+- 腐蚀操作也是用卷积核扫描图像，只不过腐蚀操作的卷积核一般都是1，如果卷积核内所有的像素点都是白色，那么锚点即为白色。
+
+![腐蚀操作](./fig/腐蚀操作.png)
+
+- 大部分时候腐蚀操作使用的都是全为1的卷积核
+
+- erode(src,kernel[,dst[,anchor[,iterations[,borderType[,borderValue]]]]])
+  - iterations是腐蚀操作的迭代次数，次数越多，腐蚀操作执行的次数越多，腐蚀效果越明显
+
+
+
+```python
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+img = cv2.imread('./fig/taylorSwift.jpg')
+
+kernel = np.ones((3, 3), np.uint8)
+dst = cv2.erode(img, kernel, iterations=1)
+
+cv2.imshow('img', np.hstack((img, dst)))
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+```
+
+
+
+![res](./fig/腐蚀操作res.png)
+
+### 8.5 获取形态学卷积核
+
+- opencv提供了获取卷积核的api，不需要我们手工创建卷积核
+- getStructuringElement(shape, ksize[,anchor])
+  - shape是指卷积核的形状，注意不是指长宽，是指卷积核中1形成的形状
+    - MORPH_RECT 卷积核中的1是矩形，常用
+    - MORPH_ELLIPSE 椭圆
+    - MORPH_CROSS 十字
+
+
+
+```python
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+print(kernel)
+
+kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
+print(kernel)
+
+kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (15, 15))
+print(kernel)
+```
+
+
+
+### 8.6 膨胀操作
+
+膨胀操作是腐蚀的相反操作，基本原理是只要保证卷积核的锚点是非0值，周边无论是0还是非0值，都变成非0值。
+
+![膨胀操作](./fig/膨胀操作.png)
+
+- dilate(img, kernel, iterations=1)
+
+
+
+```python
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+img = cv2.imread('./fig/taylorSwift.jpg')
+
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+dst = cv2.dilate(img, kernel, iterations=1)
+
+cv2.imshow('img', np.hstack((img, dst)))
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+```
+
+
+
+![膨胀操作](./fig/膨胀操作res.png)
+
+- **腐蚀、膨胀操作应用**
+
+```python
+img = cv2.imread('./fig/taylorSwift.jpg')
+
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+
+# 腐蚀
+dst1 = cv2.erode(img, kernel, iterations=2)
+
+# 膨胀
+dst2 = cv2.dilate(dst1, kernel, iterations=3)
+
+cv2.imshow('img', np.hstack((img, dst2)))
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+```
+
+
+
+![腐蚀膨胀应用](./fig/腐蚀膨胀应用res.png)
+
+
+
+### 8.7 开运算
+
+- 开运算和闭运算都是腐蚀和膨胀的基本运算
+- 开运算 = 腐蚀 + 膨胀
+- morphologyEx(img, MORPH_OPEN, kernel)
+  - MORPH_OPEN 表示形态学的开运算
+  - kernel 如果噪声点比较多，会选择大一点的kernel，如果噪声比较小，可以选择小一点的kernel
+
+
+
+```python
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+img = cv2.imread("./fig/taylorSwift.jpg")
+
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+# 腐蚀
+dst = cv2.erode(img, kernel, iterations=2)
+# 膨胀
+dst = cv2.dilate(dst, kernel, iterations=2)
+
+# 调用API
+dst = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel, iterations=3)
+
+cv2.imshow('img', np.hstack((img, dst)))
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+```
+
+ 
+
+- 自定义，腐蚀膨胀过程：
+  ![zidingyi](./fig/开运算1.png)
+- 使用开运算API
+
+![开运算2](./fig/开运算2.png)
+
+### 8.8 闭运算
+
+- 闭运算 = 膨胀 + 腐蚀
+- 可以去除图形内部的噪声
+
+
+
+```python
+import cv2
+import numpy as np
+
+img = cv2.imread("./fig/y.jpeg")
+
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+
+dst = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+cv2.imshow('img', np.hstack((img, dst)))
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+```
+
+
+
+![闭运算](./fig/闭运算.png)
+
+### 8.9 形态学梯度
+
+- 梯度 = 原图 - 腐蚀
+- 腐蚀之后原图边缘变小了，原图 - 腐蚀就可以得到腐蚀掉的部分，即边缘
+
+
+
+```python
+import cv2
+import numpy as np
+
+img = cv2.imread('./fig/taylorSwift.jpg')
+
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+dst = cv2.erode(img, kernel, iterations=6)
+
+dst = cv2.dilate(dst, kernel, iterations=3)
+
+dst = cv2.morphologyEx(dst, cv2.MORPH_GRADIENT, kernel, iterations=1)
+
+cv2.imshow('img', np.hstack((img, dst)))
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+```
+
+
+
+![形态学梯度](./fig/形态学梯度.png)
+
+### 8.10 顶帽运算
+
+- 顶帽：原图 - 开运算
+- 开运算的效果是去除图像外的噪点，原图 - 开运算就得到了去掉的噪点。
+
+
+
+```python
+import cv2
+import matplotlib.pyplot as plt
+
+img = cv2.imread("./fig/taylorSwift.jpg")
+
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+
+dst = cv2.morphologyEx(img, cv2.MORPH_TOPHAT, kernel, iterations=1)
+
+cv2.imshow('img', np.hstack((img, dst)))
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+```
+
+
+
+### 8.11 黑帽操作
+
+- 黑帽：原图 - 闭运算
+- 闭运算可以将图像内部的噪声点去掉，那么原图 - 闭运算的结果就是图像的内部噪声点
+
+
+
+```python
+import cv2
+import matplotlib.pyplot as plt
+
+img = cv2.imread("./fig/y.jpeg")
+
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+
+dst = cv2.morphologyEx(img, cv2.MORPH_BLACKHAT, kernel, iterations=1)
+
+cv2.imshow('img', np.hstack((img, dst)))
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+```
+
+
+
+
+
+## 9. 图像轮廓
+
+### 9.1 什么是图像轮廓
+
+图像轮廓是具有相同颜色或灰度的连续点的曲线。轮廓在形状分析和物体检测和识别中特别有用。
+
+轮廓的作用：
+
+- 用于图形分析
+- 乌啼的识别和检测
+
+注意点：
+
+- 为了检测的准确性，需要先对图像进行**二值化**和**Canny操作**
+- 画轮廓是会修改输入的图像，如果之后想继续使用原始图像，应该将原始图像储存到其他变量中
+
+
+
+### 9.2 查找轮廓
+
+- findContours(image,mode, method,[,contours,[,hierarchy[,offset]]])
+  - mode 查找轮廓模式
+    - RETR_EXTERNAL = 0，表示只检测外围轮廓
+    - RETR_LIST = 1，检测的轮廓不建立等级关系，即检测所有的轮廓，较为常用
+    - RETR_CCOMP = 2，每层最多两级，从小到大，从里到外
+    - RETR_TREE = 3，按照树型储存轮廓，从小到大，从右到左
+  - method 轮廓近似方法，也叫ApproximationMode
+    - CHIN_APPROX_NONE 保存所有轮廓上的点
+    - CHIN_APPROX_SIMPLE 只保存角点，比如四边形，只保留四边形的4个角，储存信息少，比较常用
+  - 返回 contours 和 hierachy 即轮廓和层级
+
+
+
+```python
+import cv2
+import numpy as np
+
+img = cv2.imread('./fig/Jennie.png')
+
+# 二值化
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+thresh, binary = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
+
+# 查找轮廓
+contours, hierarchy = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+```
+
+### 9.3 绘制轮廓
+
+- drawContours(image, Contours, contourIdx, color[,thickness,[,lineType[hierarchy[,maxLeve,[offset]]]]])
+  - image 要绘制的轮廓图像
+  - Contours 轮廓点
+  - contourIdx 要绘制的轮廓的编号，-1 表示绘制所有轮廓
+  - color 轮廓颜色，如（0，0 255）表示红色
+  - thickness 线宽，-1表示全部填充
+
+
+
+```python
+img_copy = img.copy()
+cv2.drawContours(img_copy, contours, -1, (0, 0, 255), 2)
+
+cv2.imshow('img', np.hstack((img, img_copy)))
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+```
+
+
+
+![绘制轮廓](./fig/绘制轮廓.png)
+
+### 9.4 轮廓的面积和周长
+
+轮廓面积是指每个轮廓中所有的像素点围成区域的面积，单位为像素。
+
+轮廓面积是轮廓重要的统计特性之一，通过轮廓面积的大小可以进一步分析每个轮廓隐含的信息，例如通过轮廓面积区分物体大小识别不同的物体。
+
+在查找到轮廓后,可能会有很多细小的轮廓,我们可以通过轮廓的面积进行过滤。
+
+- contourArea(contour)
+- arcLength(curve, closed)
+  - curve即轮廓
+  - closed是否是闭合的轮廓
+
+
+
+```python
+# 计算轮廓面积
+area = cv2.contourArea(contours[121])
+print(area)
+
+# 计算周长
+perimeter = cv2.arcLength(contours[121], closed=False)
+print(perimeter)
+```
+
+
+
+### 9.5 多边形逼近与凸包
+
+​	**findContours后的轮廓信息contours可能过于复杂不平滑，可以用approxPolyDP函数对该多边形曲线做适当近似**,这就是轮廓的多边形逼近.apporxPolyDP就是以多边形去逼近轮廓，采用的是Douglas-Peucker算法(方法名中的DP).DP算法原理比较简单，核心就是不断找多边形最远的点加入形成新的多边形，直到最短距离小于指定的精度。
+
+- pproxPolyDP(curve, epsilon, closed[ approxCurve])
+  - curve 要近似逼近的轮廓
+  - epsilon 即DP算法使用的阈值
+  - closed轮廓是否闭合
+
+
+
+```python
+approx = cv2.approxPolyDP(contours[1090], 50, closed=True)
+
+aa = cv2.drawContours(img_copy, [approx], 0, (0, 0, 255), 2)
+```
+
+
+
+​	逼近多边形是轮廓的高度近似，但是有时候，我们希望使用一个多边形的凸包来简化它。凸包跟逼近多边形很像，只不过它是物体最外层的凸多边形。凸包指的是完全包含原有轮廓，并且仅由轮廓上的点所构成的多边形。凸包的每一处都是凸的，即在凸包内连接任意两点的直线都在凸包的内部。在凸包内，任意连续三个点的内角小于180°。
+
+- convexHull(points[,hull[,clockwise[,returnPoints]]])
+  - points 即轮廓
+  - colckwise 顺时针绘制
+
+
+
+```python
+hull = cv2.convexHull(contours[2261])
+
+bb = cv2.drawContours(img, [hull], 0, (0, 0, 255), 2)
+```
+
+
+
+### 9.6 外接矩形
+
+外接矩形分为最小外接矩形和最大外接矩形
+
+如下图，红色矩形为最小外接矩形，绿色矩形为最大外接矩形
+
+![外接矩形](./fig/外接矩形.png)
+
+
+
+- minAreaRect(points) 最小外接矩阵
+  - points 即为轮廓
+  - 返回元组,内容是一个旋转矩形(RotatedRect)的参数:矩形的起始坐标x,y,矩形的宽度和高度,矩形的旋转角度
+- boundingRect(points) 最大外接矩阵
+  - points 即为轮廓
+
+
+
+```python
+# 。。。。。
+```
+
+
+
+## 10. 图像金字塔
+
+
+
+### 10.1 图像金字塔介绍
+
+​	**图像金字塔**是图像中多尺度表达的一种，最主要用于图像的分割，是一种以多分辨率来解释图像的有效但概念简单的结构。简单来说,图像金字塔是同一图像不同分辨率的子图集合。
+
+​	图像金字塔最初用于机器视觉和图像压缩，一幅图像的金字塔是一系列以金字塔形状排列的分辨率逐步降低，且来源于同一张原始图的图像集合。其通过梯次向下采样获得，直到达到某个终止条件才停止采样。金字塔的底部是待处理图像的高分辨率表示，而顶部是低分辨率的近似。我们将一层一层的图像比喻成金字塔，层级越高，则图像越小，分辨率越低。
+
+![图像金字塔](./fig/图像金字塔.png)
+
+#### 常见的图像金字塔
+
+##### 高斯金字塔（Gaussian pyramid）：用来向下/降采样，主要的图像金字塔
+
+##### 拉普拉斯金字塔(Laplacian pyramid):用来从金字塔低层图像重建上层未采样图像，在数字图像处理中也即是预测残差，可以对图像进行最大程度的还原，配合高斯金字塔一起使用。
+
+
+
+### 10.2 高斯金字塔
+
+**高斯金字塔**是通过高斯平滑和亚采样(subsampling)获得一系列下采样图像.
+
+原理非常简单, 如下图所示
+
+
+
+![高斯卷积核](./fig/高斯卷积核.png)
+
+
+
+原始图像 M * N -> 处理后图像 M / 2 * N / 2
+
+每次处理完后，结果图像是原来的 1 / 4
+
+![高斯金字塔](./fig/gaosi.png)
+
+注意：向下采样会丢失图像信息
+
+- 向上取样：向下采样的相反过程，是指图像从小到大的过程
+
+
+
+![上采样](./fig/上采样.png)
+
+
+
+- pyrDown() 向下采样
+
+```python
+import cv2
+import numpy as np
+
+img = cv2.imread('./fig/lenna.png')
+
+dst = cv2.pyrDown(img_rgb)
+
+print(img_rgb.shape, dst.shape)
+```
+
+- pyrUp() 向上采样
+
+```python
+img = cv2.imread('./fig/lenna.png')
+
+dst = cv2.pyrUp(img_rgb)
+
+print(img_rgb.shape, dst.shape)
+```
+
+
+
+### 10.3 拉普拉斯金字塔
+
+$$
+L_i=G_i-PyrUp(PyrDown(G_i))
+$$
+
+$G_i$，原始图像；$L_i$，拉普拉斯金字塔图像
+
+​	将降采样之后的图像再进行上采样操作，然后与之前还没降采样的原图进行做差得到残差图!为还原图像做信息的准备!也就是说，拉普拉斯金字塔是通过源图像减去先缩小后再放大的图像的一系列图像构成的。保留的是残差!拉普拉斯金字塔是由高斯金字塔构成的,没有专门的函数。拉普拉斯金字塔图像只像图像边缘,它的大部分元素都是0,用于图图像压缩.
+
+
+
+![拉普拉斯金字塔](./fig/拉普拉斯金字塔1.png)
+
+
+
+![拉普拉斯金字塔2](./fig/拉普拉斯金字塔2.png)
+
+
+
+```python
+import cv2
+import numpy as np
+
+img = cv2.imread('./fig/Jennie.png')
+# img_rgb = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+plt.imshow(img)
+
+dst = cv2.pyrDown(img)
+dst = cv2.pyrUp(dst)
+
+plt.imshow(dst)
+
+lap0 = img - dst
+
+plt.imshow(lap0)
+```
+
+
+
+![lap](./fig/lap.png)
+
+
+
+## 11. 图像直方图
+
+
+
+### 11.1 图想直方图的基本概念
+
+​	在统计学中，直方图是一种对数据分布情况的图形表示，是一种二维统计图表
+
+​	**图像直方图**是用一表示数字图像中亮度分布的直方图，标绘了图像中每个亮度值的像素数。可以借助观空该直方图了解需要如何调整亮度分布的直方图。这种直方图中，横坐标的左侧为纯黑、较暗的区域，而右侧为较亮、纯白的区域。因此，一张较暗图片的图像直方图中的数据多集中于左侧和中间部分，而整体明亮、只有少量阴影的图像则相反。
+
+- 横坐标: 图像中各个像素点的灰度级
+- 纵坐标: 具有该灰度级的像素个数
+
+
+
+![hist_tonalrange](./fig/hist_tonalrange.png)
+
+
+
+
+
+- 归一化直方图
+  - 图像中各个像素点的灰度级
+  - 出现该灰度级的概率
+
+- **直方图术语：**
+  - dims：需要统计的特征的数目。如：dim=1，表示我们仅统计灰度值
+  - bins：每个特征空间子区段的数目
+  - range：统计灰度值的范围，一般为[0, 255]
+
+
+
+### 11.2 使用OpenCV统计直方图
+
+- calcHist(images, channels, mask, histSize, ranges[,hist[,accumulate]])
+  - images: 原始图像
+  - hannels: 指定通道需要用中括号括起来,输入图像是灰度图像是,值是[0]，彩色图像可以是[0]，[1]，[2],分别对应 B,G,R.
+  - mask: 掩码图像
+    - 统计整幅图像的直方图,设为None
+    - 统计图像某一部分的直方图时,需要掩码图像
+  - histSize: BINS的数量
+    - 需要用中括号括起来,例如[256]
+  - ranges: 像素值范围,例如[0,255]
+  - accumulate: 累积标识
+    - 默认值为False
+    - 如果被设置为True, 则直方图在开始分配时不会被清零
+    - 该参数允许从多个对象中计算单个直方图,或者用于实时更新直方图
+    - 多个直方图的累积结果,用于对一组图像计算直方图
+
+
+
+```python
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+img = cv2.imread("./fig/Jennie.png")
+img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+plt.imshow(img_rgb)
+
+hist = cv2.calcHist([img_rgb], [0], None, [256], [0, 255])
+
+print(hist)
+```
+
+
+
+### 11.3 使用OpenCV绘制直方图
+
+- matlibplot
+
+
+
+```python
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+img = cv2.imread("./fig/Jennie.png")
+img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+plt.imshow(img_rgb)
+
+hist = cv2.calcHist([img_rgb], [0], None, [256], [0, 255])
+
+print(hist)
+
+hist1 = cv2.calcHist([img_rgb], [0], None, [256], [0, 255])
+hist2 = cv2.calcHist([img_rgb], [1], None, [256], [0, 255])
+hist3 = cv2.calcHist([img_rgb], [2], None, [256], [0, 255])
+
+x = np.linspace(0, 255, 256)
+
+plt.plot(x, hist1, 'y-')
+plt.plot(x, hist2, ':b')
+plt.plot(x, hist3, 'r^-')
+```
+
+
+
+![hist](./fig/hist.png)
+
+
+
+### 11.4 使用掩膜的直方图
+
+- 掩膜
+
+![掩膜](./fig/掩膜.png)
+
+- 如何生成掩膜
+  - 先生成一个全黑的和原始图片大小一样大的图片，mask = np.zeros(image.shape, np.uint8)
+  - 将想要的区域通过索引方式设置为255.mask[1000:200,, 200:300] = 355
+
+
+
+```python
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+img = cv2.imread('./fig/lenna.png')
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+mask = np.zeros(gray.shape, np.uint8)
+mask[100:200, 100:200] = 255
+
+plt.imshow(cv2.cvtColor(mask, cv2.COLOR_BAYER_BG2RGB))
+
+plt.imshow(cv2.cvtColor(cv2.bitwise_and(gray, gray, mask=mask), cv2.COLOR_BAYER_BG2RGB))
+```
+
+
+
+| ![1](./fig/mask1.png) | ![2](./fig/mask2.png) |
+| --------------------- | --------------------- |
+
+
+
+### 11.5 直方图均衡化原理
+
+​	直方图均衡化是通过拉伸像素强度的分布范围， 便得在0~255灰阶上的分布更加均衡，提高了图像的对比度，达到改善图像主观视觉效果的目的。对比度较低的图像适合使用直方图均衡化方法来增强图像细节。
+
+![均衡化](./fig/均衡化.png)
+
+
+
+
+
+**原理：**
+
+1. 计算累计直方图
+2. 将累计直方图进行区间转换
+3. 在累计直方图中，概率相近的原始图，会被处理为相同的值
+
+![均衡化原理](./fig/均衡化原理1.png)
+
+
+
+
+
+![均衡化原理2](./fig/均衡化原理2.png)
+
+
+
+![均衡化原理3](./fig/均衡化原理3.png)
+
+
+
+![](./fig/均衡化原理4.png)
+
+
+
+- equqlizeHist(src[,dst])
+  - src 原图像
+  - dst 目标图像
+
+
+
+```python
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+```
+
+
+
+- 均衡化处理前：
+
+![equqlizeHist1](./fig/equqlizeHist1.png)
+
+
+
+加深变浅：
+
+![equqlizeHist1](./fig/equqlizeHist2.png)
+
+
+
+ 直方图：![equqlizeHist3](./fig/equqlizeHist3.png)
+
+​	
+
+
+
+- 均衡化处理后：
+
+  DARK
+
+![dark_equ](./fig/dark_equ.png)
+
+​	BRIGHT
+
+![bright_equ](./fig/bright_equ.png)
+
+
+
+直方图：![equ](./fig/equ.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1693,3 +2465,9 @@ cv2.destroyAllWindows()
 - **[7.滤波器](滤波器.ipynb)**
 
 - **[8.形态学](形态学.ipynb)**
+
+- **[9.图像轮廓](图像轮廓.ipynb)**
+
+- **[10.图像金字塔](图像金字塔.ipynb)**
+
+- **[11.图像直方图](图像直方图.ipynb)**
