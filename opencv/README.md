@@ -2440,7 +2440,258 @@ import matplotlib.pyplot as plt
 
 
 
+## 12. 车辆统计项目
 
+效果图：
+
+![车辆统计](./fig/carCount1.png)
+
+
+
+
+
+- 涉及到的内容
+  - 窗口的展示
+  - 图像/视频的加载
+  - 基本图像的绘制
+  - 车辆识别
+    - 基本图像运算与处理
+    - 形态学
+    - 轮廊查找
+
+- 整体流程
+
+1. 加载视频
+2. **通过形态学识别车辆**
+3. **对车辆进行统计**
+4. 显示车辆统计信息
+
+
+
+- 知识补充
+  - 背景减除
+    - 背景减除(Background Subtraction)是许多基于计算机视觉的任务中的主要预处理步理。如果我们有完整的静止的背景帧，那么我们可以通过帧差法来计算像素差从而获取到前景对象。但是在大多教情况下，我们可能没有这样的图像，所以我们需要从我们拥有的任何图像中提取背案，当运动物体有阴影时，由于阴影也在移动，情况会变的变得更加复杂，为此引入了背景减除算法，通过这一方法我们能够从视频中分离出运动的物体前景，从而达到目标检测的目的
+      - BackgroundSubtractorMOG
+        - 这是一个以深合高斯模型为基础的前景/背票分割算法。它是P.KadewTraKuPong 和R.Bowden在2001年提出的
+        - 它使用 K(K=3 或 5)个高斯分布混合对背景像素进行建模，使用这些颜色(在整个视频中)存在时间的长短作为混合的权重。背景的颜色一般持续的时间最长，而且更加静止。
+        - 在编写代码时，我们需要使用酒数:cv2.createBackqroundSubtractorMOG()创建一个背景对象。这个函数有些可选参数，比如要进行建模场景的时间长度，高斯混合成分的数量，阈值等。将他们全部设置为默认值，然后在整个视频中我们是需要使用backgroundsubtractor.apply()就可以得到前景的掩模了
+        - 移动的物体会被标记为白色，背景会被标记为黑色的
+
+示例代码：
+
+```python
+import cv2
+import numpy as np
+
+cap = cv2.VideoCapture(0)
+bgs = cv2.bgsegm.createBackgroundSubtractorMOG()
+
+while True:
+     ret, frame = cap.read()
+     
+     if ret == True:
+          fgmask = bgs.apply(frame)
+          cv2.imshow('video', fgmask)
+          
+     key = cv2.waitKey(1)
+     if key == 27:
+          break
+          
+cap.release()
+cv2.destoryAllWindows()
+```
+
+
+
+##### 完整代码：
+
+```python
+import cv2
+import numpy as np
+
+cap = cv2.VideoCapture('./video/car.mp4')
+
+bgs = cv2.bgsegm.createBackgroundSubtractorMOG()
+
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+
+min_w, min_h = 100, 90
+line_high = 600
+
+# 偏移量
+offset = 7
+
+cars = []
+cars_count = 0
+
+# 计算中心点
+def center(x, y, w, h):
+    return int(w / 2 + x), int(h / 2 + y)
+
+while True:
+    ret, frame = cap.read()
+    if ret == True:
+        # 把原始帧进行灰度化，然后去噪
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # 去噪
+        blur = cv2.GaussianBlur(gray, (3, 3), 5)
+        fgmask = bgs.apply(blur)
+        
+        # 腐蚀
+        erode = cv2.erode(fgmask, kernel)
+        # 膨胀
+        dilate = cv2.dilate(erode, kernel, iterations=2)
+        
+        # 消除内部的小方块 - 闭运算
+        close = cv2.morphologyEx(dilate, cv2.MORPH_CLOSE, kernel)
+        
+        # 查找轮廓
+        contours, _ = cv2.findContours(close, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # 画出检测线
+        cv2.line(frame, (10, line_high), (1200, line_high), (0, 255, 0), 3)
+        
+        # 画出所有检测出来的轮廓
+        for contour in contours:
+            # 最大外接矩形
+            (x, y, w, h) = cv2.boundingRect(contour)
+            
+            # 通过外接矩形的宽高，过滤多余过小矩形
+            is_vaild = (w >= min_w) & (h >= min_h)
+            if not is_vaild:
+                continue
+                
+            # 要求坐标点都是整数
+            cv2.rectangle(frame, (int(x), int(y)), (int(x+w), int(y+h)), (0, 0, 255), 2)
+            
+            # 把车抽象成一点，即外接矩形的中心点
+            cpoint = center(x, y, w, h)
+            cars.append(cpoint)
+            cv2.circle(frame, (cpoint), 5, (0, 0, 255), -1)
+            
+            # 判断汽车是否过线
+            for (x, y) in cars:
+                if y > (line_high - offset) and y < (line_high + offset):
+                    # 有效
+                    # count
+                    cars_count += 1
+                    cars.remove((x, y))
+        
+        cv2.putText(frame, "Vehicle Cpount:" + str(cars_count), (500, 60), \
+                    cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, 2, (0, 0, 255), 5)
+        cv2.imshow('video', frame)
+        
+    key = cv2.waitKey(10)
+    # esc
+    if key == 27:
+        break
+        
+# 释放资源
+cap.release()
+cv2.destroyAllWindows()
+```
+
+
+
+## 13.特征点检测和匹配
+
+### 1. 特征检测的基本概念
+
+​	**特征检测**是计算机视觉和图像处理中的一个概念。它指的是使用计算机提取图像信息，决定每个图像的点是否属于一个图像特征。特征检测的结果是把图像上的点分为不同的子集，这些子集往往属于孤立的点、连续的曲线或者连续的区域。
+
+​	特征检测包括边缘检测,角检测,区域检测和脊检测
+
+特征检测应用场景:
+
+- 图像搜索,比如以图搜图
+- 拼图游戏
+- 图像拼接
+
+
+
+图像特征就是值有意义的图像区域,具有独特性,易于识只别性, 比较角点, 斑点以及高密度区，在图像特征中最重要的就是角点.哪些是角点呢?
+
+- 灰度梯度的最大值对应的像素
+- 两条线的交点
+- 极值点(一阶导数最大,二阶导数为0)
+
+
+
+### 2. Harris角点检测
+
+![Harris](./fig/Harris.png)
+
+
+
+**Harris角点检测原理：**
+
+图像(x, y)，当在点(x, y)处平移($\Delta x,\Delta y $)后的自相似性：
+$$
+c(x,y;\Delta x,\Delta y) = \sum_{(u,v)\in W(x,y)} w(u,v)(I(u,v)-I(u+\Delta x,v+\Delta y))^2 
+$$
+W(x,y)是以点(x,y)为中心的窗口，即加权函数，例如高斯加权函数
+
+[理论推导](https://zhuanlan.zhihu.com/p/449970674)
+
+![Harris0](./fig/Harris0.webp)
+
+
+
+角点响应：
+
+$R=detM - \alpha(traceM)^2$
+
+其中：
+
+$detM=\lambda_1 \lambda_2 ,traceM=\lambda_1+\lambda_2$
+
+
+
+检测窗口在图像上移动,上图对应着三种情况:
+
+- 在平坦区域,无论向哪个方向移动,衡量系统变换不大
+- 边缘区域,垂直边缘移动时,衡量系统变换剧烈
+- 在角点处，往哪个方向移动,衡量系统都变化剧烈
+
+- cornerHarris(src, blockSize, ksize, k[,dst[, borderType]])
+  - blockSize: 检测窗口大小
+  - ksize: sobel的卷积核
+  - k: 权重系数, 即上面公式中的α，是个经验值,一般取0.04~0.06之间.一般默认0.04
+
+
+
+```python
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+img = cv2.imread('./fig/Jennie.png')
+
+# 灰度化
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+# 角点检测
+## 返回角点响应
+dst = cv2.cornerHarris(gray, blockSize=2, ksize=3, k=0.04)
+print(gray.shape)
+print(dst.shape, type(dst))
+
+# 显示角点
+# s设定阈值
+img[dst > (0.001 * dst.max())] = [0, 0, 255]
+
+plt.imshow(cv2.cvtColor(img,cv2.COLOR_BGR2RGB))
+```
+
+
+
+![角点检测](./fig/角点检测.png)
+
+
+
+
+
+### 3.SIFT关键点检测
 
 
 
@@ -2471,3 +2722,5 @@ import matplotlib.pyplot as plt
 - **[10.图像金字塔](图像金字塔.ipynb)**
 
 - **[11.图像直方图](图像直方图.ipynb)**
+
+- **[12.车辆统计项目](车辆统计项目.ipynb)**
